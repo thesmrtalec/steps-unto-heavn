@@ -143,12 +143,33 @@
   .tag-input { width: 90px; border: 1px solid var(--rule); border-radius: 5px; padding: 3px 7px; font-size: 13px; font-family: var(--mono); background: var(--card); color: var(--ink); }
   .delete-btn { background: transparent; border: none; color: var(--faint); font-size: 13px; margin-left: auto; padding: 2px 6px; opacity: .7; }
   .delete-btn:hover { color: var(--accent2); opacity: 1; }
+  .delete-btn.confirm { color: var(--accent2); font-family: var(--mono); font-size: 11px; opacity: 1; }
   .empty { color: var(--faint); font-style: italic; font-size: 15px; padding: 14px 2px; }
 
   .backup { margin-top: 40px; padding-top: 14px; border-top: 1px solid var(--rule); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
   .backup button { background: var(--card); border: 1px solid var(--rule); color: var(--muted); border-radius: 999px; padding: 4px 12px; font-size: 11.5px; font-family: var(--mono); }
   .backup button:hover { border-color: var(--accent); color: var(--accent); }
   .backup-note { font-size: 11.5px; color: var(--faint); font-style: italic; }
+
+  /* ——— notes drawer ——— */
+  .notes-tab { display: inline-flex; align-items: center; gap: 5px; background: transparent; border: none; color: var(--faint); font-family: var(--mono); font-size: 11.5px; padding: 4px 6px; }
+  .notes-tab:hover { color: var(--accent); }
+  .notes-overlay { position: fixed; inset: 0; background: var(--page); z-index: 50; display: none; flex-direction: column; }
+  .notes-overlay.open { display: flex; }
+  .notes-inner { max-width: 620px; width: 100%; margin: 0 auto; padding: 20px 18px 40px; display: flex; flex-direction: column; flex: 1; min-height: 0; }
+  .notes-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .notes-head h2 { font-family: var(--serif); font-style: italic; font-size: 22px; margin: 0; color: var(--ink); }
+  .notes-close { margin-left: auto; background: transparent; border: 1px solid var(--rule); color: var(--muted); border-radius: 999px; padding: 5px 14px; font-family: var(--mono); font-size: 12px; }
+  .notes-canvas { width: 100%; border: 1px solid var(--rule); border-radius: 10px; padding: 14px; font-size: 16px; font-family: var(--serif); line-height: 1.6; background: var(--card); color: var(--ink); resize: none; min-height: 220px; box-shadow: inset 0 1px 4px rgba(0,0,0,.10); }
+  .notes-save { align-self: flex-start; margin-top: 10px; background: var(--accent); color: var(--onaccent); border: none; border-radius: 8px; padding: 8px 20px; font-family: var(--mono); font-size: 12px; letter-spacing: .07em; text-transform: uppercase; font-weight: 700; }
+  .notes-save:hover { background: var(--accent2); }
+  .notes-index { margin-top: 22px; overflow-y: auto; }
+  .notes-index-label { font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+  .note-card { background: var(--card); border: 1px solid var(--rule); border-left: 3px solid var(--accent); border-radius: 9px; padding: 12px 14px; margin-bottom: 9px; box-shadow: var(--cardshadow); cursor: pointer; }
+  .note-card p { margin: 0; font-size: 15px; line-height: 1.5; color: var(--ink); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .note-card .note-date { font-family: var(--mono); font-size: 10.5px; color: var(--faint); margin-top: 7px; display: flex; align-items: center; }
+  .note-del { margin-left: auto; background: transparent; border: none; color: var(--faint); font-family: var(--mono); font-size: 11px; padding: 0 4px; }
+  .note-del:hover { color: var(--accent2); }
 </style>
 </head>
 <body>
@@ -218,7 +239,22 @@
     <button id="exportBtn">Export backup</button>
     <button id="importBtn">Import</button>
     <input type="file" id="importFile" accept=".json" style="display:none" />
+    <button class="notes-tab" id="notesOpen">🗒 notes</button>
     <span class="backup-note">Your data lives on this device only.</span>
+  </div>
+  <div class="notes-overlay" id="notesOverlay">
+    <div class="notes-inner">
+      <div class="notes-head">
+        <h2 id="notesTitle">Notes & to-dos</h2>
+        <button class="notes-close" id="notesClose">done</button>
+      </div>
+      <textarea class="notes-canvas" id="notesCanvas" placeholder="Notes, to-dos, impressions…"></textarea>
+      <button class="notes-save" id="notesSave">Save note</button>
+      <div class="notes-index">
+        <div class="notes-index-label">earlier notes</div>
+        <div id="notesList"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -237,21 +273,21 @@
   };
   var STAGES = ["notice", "record", "treasure"];
   var PLACEHOLDERS = [
-    "Thank the Lord thy God in all things. \u2014 D&C 59:7",
-    "Live in thanksgiving daily. \u2014 Alma 34:38",
-    "All things denote there is a God. \u2014 Alma 30:44",
-    "The heavens declare the glory of God. \u2014 Psalm 19:1",
-    "The earth is full of the goodness of the Lord. \u2014 Psalm 33:5",
-    "He who receiveth all things with thankfulness shall be made glorious. \u2014 D&C 78:19",
-    "Confess his hand in all things. \u2014 D&C 59:21",
-    "Made to please the eye and to gladden the heart. \u2014 D&C 59:18",
-    "O give thanks unto the Lord; for he is good. \u2014 Psalm 107:1",
-    "Behold, it was very good. \u2014 Genesis 1:31",
+    "Thank the Lord thy God in all things. — D&C 59:7",
+    "Live in thanksgiving daily. — Alma 34:38",
+    "All things denote there is a God. — Alma 30:44",
+    "The heavens declare the glory of God. — Psalm 19:1",
+    "The earth is full of the goodness of the Lord. — Psalm 33:5",
+    "He who receiveth all things with thankfulness shall be made glorious. — D&C 78:19",
+    "Confess his hand in all things. — D&C 59:21",
+    "Made to please the eye and to gladden the heart. — D&C 59:18",
+    "O give thanks unto the Lord; for he is good. — Psalm 107:1",
+    "Behold, it was very good. — Genesis 1:31",
     "Count your many blessings; name them one by one.",
-    "This is my work and my glory. \u2014 Moses 1:39"
+    "This is my work and my glory. — Moses 1:39"
   ];
 
-  var state = { bits: [], quota: 7, mics: [], riffs: [], good: [], planned: [] };
+  var state = { bits: [], quota: 7, mics: [], riffs: [], good: [], notes: [], planned: [] };
   var stageFilter = "notice";
   var tagFilter = null;
   var tagEditing = null;
@@ -275,6 +311,7 @@
         state.riffs = data.riffs || [];
         state.good = data.good || [];
         state.planned = data.planned || [];
+        state.notes = data.notes || [];
       }
     } catch (e) {}
   }
@@ -351,7 +388,7 @@
         save(); render();
       };
       row.appendChild(did);
-      var skip = el("button", "planned-skip", "\u2715");
+      var skip = el("button", "planned-skip", "✕");
       skip.setAttribute("aria-label", "remove planned mic");
       skip.onclick = function () {
         state.planned = state.planned.filter(function (x) { return x.id !== p.id; });
@@ -448,11 +485,11 @@
       var meta = el("div", "bit-meta");
 
       var stageWrap = el("span", "stage-wrap st-" + b.status);
-      var back = el("button", "stage-step", "\u2039");
+      var back = el("button", "stage-step", "‹");
       back.title = "Move back";
       back.onclick = function () { b.status = PREV[b.status]; b.statusAt = Date.now(); save(); render(); };
       var stageLab = el("span", "stage-lab", STAGE[b.status].label);
-      var fwd = el("button", "stage-step", "\u203A");
+      var fwd = el("button", "stage-step", "›");
       fwd.title = "Move forward";
       fwd.onclick = function () { b.status = NEXT[b.status]; b.statusAt = Date.now(); save(); render(); };
       stageWrap.appendChild(back); stageWrap.appendChild(stageLab); stageWrap.appendChild(fwd);
@@ -460,13 +497,13 @@
 
       var sd = staleDays(b);
       if (sd > 0) {
-        var st = el("span", "stale", "\u23F3 stale " + sd + "d");
+        var st = el("span", "stale", "⏳ stale " + sd + "d");
         st.title = "Advance it or kill it";
         meta.appendChild(st);
       }
 
       b.tags.forEach(function (t) {
-        var tag = el("button", "bit-tag", t + " \u2715");
+        var tag = el("button", "bit-tag", t + " ✕");
         tag.title = "Tap to remove tag";
         tag.onclick = function () {
           b.tags = b.tags.filter(function (x) { return x !== t; });
@@ -498,9 +535,15 @@
       ed.onclick = function () { textEditing = b.id; expanded = b.id; render(); };
       meta.appendChild(ed);
 
-      var del = el("button", "delete-btn", "\u2715");
-      del.setAttribute("aria-label", "delete bit");
+      var del = el("button", "delete-btn", "✕");
+      del.setAttribute("aria-label", "delete entry");
       del.onclick = function () {
+        if (del.textContent === "✕") {
+          del.textContent = "sure?";
+          del.classList.add("confirm");
+          setTimeout(function () { if (del) { del.textContent = "✕"; del.classList.remove("confirm"); } }, 2500);
+          return;
+        }
         state.bits = state.bits.filter(function (x) { return x.id !== b.id; });
         save(); render();
       };
@@ -611,6 +654,67 @@
     };
     reader.readAsText(file);
     e.target.value = "";
+  };
+
+  // ——— notes drawer ———
+  var noteEditing = null;
+  function renderNotes() {
+    var list = document.getElementById("notesList");
+    list.innerHTML = "";
+    var notes = (state.notes || []).slice().sort(function (a, b) { return b.updated - a.updated; });
+    if (notes.length === 0) {
+      var empty = el("p", "empty", "No notes yet.");
+      list.appendChild(empty);
+      return;
+    }
+    notes.forEach(function (note) {
+      var card = el("div", "note-card");
+      card.appendChild(el("p", null, note.text));
+      var meta = el("div", "note-date");
+      var d = new Date(note.updated);
+      meta.appendChild(el("span", null, d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " · " + d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })));
+      var del = el("button", "note-del", "delete");
+      del.onclick = function (e) {
+        e.stopPropagation();
+        if (del.textContent === "delete") { del.textContent = "sure?"; setTimeout(function () { if (del) del.textContent = "delete"; }, 2500); return; }
+        state.notes = state.notes.filter(function (n) { return n.id !== note.id; });
+        save(); renderNotes();
+      };
+      meta.appendChild(del);
+      card.appendChild(meta);
+      card.onclick = function () {
+        noteEditing = note.id;
+        document.getElementById("notesCanvas").value = note.text;
+        document.getElementById("notesCanvas").focus();
+        document.getElementById("notesSave").textContent = "Update note";
+      };
+      list.appendChild(card);
+    });
+  }
+  function resetNoteEditor() {
+    noteEditing = null;
+    document.getElementById("notesCanvas").value = "";
+    document.getElementById("notesSave").textContent = "Save note";
+  }
+  document.getElementById("notesOpen").onclick = function () {
+    if (!state.notes) state.notes = [];
+    resetNoteEditor();
+    renderNotes();
+    document.getElementById("notesOverlay").classList.add("open");
+  };
+  document.getElementById("notesClose").onclick = function () {
+    document.getElementById("notesOverlay").classList.remove("open");
+  };
+  document.getElementById("notesSave").onclick = function () {
+    var t = document.getElementById("notesCanvas").value.trim();
+    if (!t) return;
+    if (!state.notes) state.notes = [];
+    if (noteEditing) {
+      state.notes = state.notes.map(function (n) { return n.id === noteEditing ? { id: n.id, text: t, updated: Date.now() } : n; });
+    } else {
+      state.notes.unshift({ id: Date.now().toString(36), text: t, updated: Date.now() });
+    }
+    save(); resetNoteEditor(); renderNotes();
   };
 
   load();
